@@ -1,1 +1,2 @@
-APlayerSDK.zip -- 最新SDK版本：3.16.3.931
+APlayerSDK.zip -- 最新SDK版本：3.16.3.931 （2023年1月30日）
+    from http://aplayer.open.xunlei.com/index.html

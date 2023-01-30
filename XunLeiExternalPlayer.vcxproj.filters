@@ -13,21 +13,33 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Source Files\video_src">
+      <UniqueIdentifier>{35ea2f8c-17d8-4dfd-9137-84024c1b2bd4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\VideoPlayer\simpleplayer.h">
+    <ClInclude Include="src\InsituDebug.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="src\VideoPlayer\PlayerSink.h">
+      <Filter>Source Files\video_src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\VideoPlayer\simpleplayer.h">
+      <Filter>Source Files\video_src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\resource.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\VideoPlayer\PlayerSink.cpp">
+    <ClCompile Include="src\InsituDebug.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\VideoPlayer\PlayerSink.cpp">
+      <Filter>Source Files\video_src</Filter>
+    </ClCompile>
     <ClCompile Include="src\VideoPlayer\simpleplayer.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\video_src</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

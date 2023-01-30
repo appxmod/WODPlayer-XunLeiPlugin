@@ -1,0 +1,785 @@
+diff --git a/simpleplayer.cpp b/simpleplayer.cpp
+index 2cf960b..364c71e 100644
+--- a/simpleplayer.cpp
++++ b/simpleplayer.cpp
+@@ -1,14 +1,11 @@
+-#include "Simpleplayer.h"
++
++#include "simpleplayer.h"
+ #include "Resource.h"
+ #include "PlayerSink.h"
+ #include <CommCtrl.h>
+ 
+-#include <atlbase.h>
+-#include <atlhost.h>
+-
+-//#include "VideoPlayer.h"
+-#include "InsituDebug.h"
+ 
++#pragma comment(lib, "atl.lib")
+ #define countof(x)			(sizeof(x)/sizeof(x[0]))
+ 
+ #define CONFIGID_PLAYRESULT		7		// Play result
+@@ -31,24 +28,34 @@
+    HANDLE_##message((hWnd), (wParam), (lParam), (fn))))
+ 
+ 
+-//CMyPlayer					g_MyPlayer;
++CMyPlayer					g_MyPlayer;
+ CPlayerSink					g_APlayerSink;
++HWND						g_hDialog = NULL;
++HWND						g_hTextWnd = NULL;
++HWND						g_hFullScreenWnd = NULL;
++
++void EnterFullScreen(void);
++void ExitFullScreen(void);
+ 
+ 
+ HRESULT CMyPlayer::OnMessage(LONG nMessage, LONG wParam, LONG lParam)
+ {
+ 	switch(nMessage)
+ 	{
+-	case WM_SETFOCUS:
+-		LogIs(2, "WM_SETFOCUS");
+-		return TRUE;
+ 	case WM_LBUTTONDBLCLK:
++		{
++			if(::IsWindowVisible(g_hFullScreenWnd))
++				ExitFullScreen();
++			else
++				EnterFullScreen();
++		}
+ 		break;
+ 
+ 	case WM_KEYDOWN:
+ 		switch(LOWORD(wParam))
+ 		{
+ 		case VK_ESCAPE:
++			ExitFullScreen();
+ 			break;
+ 		}
+ 		break;
+@@ -68,78 +75,65 @@ int CMyPlayer::GetConfigInt(int nConfigId)
+ HRESULT CMyPlayer::OnStateChanged(LONG nOldState, LONG nNewState)
+ {
+ 	TCHAR szText[MAX_PATH];
+-	if (nNewState==PS_CLOSING)
++	HWND hWnd = GetDlgItem(g_hTextWnd, IDC_STATIC1);
++
++	switch(nNewState)
+ 	{
+-		//m_pAPlayer->Play();
++	case PS_READY:
++		{
++			DWORD dwPlayResult = g_MyPlayer.GetConfigInt(CONFIGID_PLAYRESULT);
++			switch(dwPlayResult)
++			{
++			case S_OK:
++				SetWindowText(hWnd, _T("²¥·ÅÍê³É£¡"));
++				SetWindowText(GetDlgItem(g_hTextWnd, IDPAUSE), _T("²¥·Å"));
++				break;
++
++			case S_FALSE:
++				SetWindowText(hWnd, _T("×¼±¸¾ÍÐ÷£¡"));
++				break;
++
++			default:
++				wsprintf(szText, _T("²¥·ÅÊ§°Ü£¬´íÎóÂë 0x%08X"), dwPlayResult);
++				SetWindowText(hWnd, szText);
++				break;
++			}
++		}
++		break;
++
++	case PS_OPENING:
++		SetWindowText(hWnd, _T("ÕýÔÚ´ò¿ª..."));
++		break;
++
++	case PS_PAUSING:
++		SetWindowText(hWnd, _T("ÕýÔÚÔÝÍ£..."));
++		break;
++
++	case PS_PAUSED:
++		break;
++
++	case PS_PLAYING:
++		SetWindowText(hWnd, _T("¿ªÊ¼²¥·Å..."));
++		break;
++
++	case PS_PLAY:
++		break;
++
++	case PS_CLOSING:
++		SetWindowText(hWnd, _T("ÕýÔÚ¹Ø±Õ..."));
++		break;
+ 	}
+-	//HWND hWnd = GetDlgItem(g_hTextWnd, IDC_STATIC1);
+-	//
+-	//switch(nNewState)
+-	//{
+-	//case PS_READY:
+-	//	{
+-	//		DWORD dwPlayResult = g_MyPlayer.GetConfigInt(CONFIGID_PLAYRESULT);
+-	//		switch(dwPlayResult)
+-	//		{
+-	//		case S_OK:
+-	//			SetWindowText(hWnd, _T("æ’­æ”¾å®Œæˆï¼"));
+-	//			SetWindowText(GetDlgItem(g_hTextWnd, IDPAUSE), _T("æ’­æ”¾"));
+-	//			break;
+-	//
+-	//		case S_FALSE:
+-	//			SetWindowText(hWnd, _T("å‡†å¤‡å°±ç»ªï¼"));
+-	//			break;
+-	//
+-	//		default:
+-	//			wsprintf(szText, _T("æ’­æ”¾å¤±è´¥ï¼Œé”™è¯¯ç  0x%08X"), dwPlayResult);
+-	//			SetWindowText(hWnd, szText);
+-	//			break;
+-	//		}
+-	//	}
+-	//	break;
+-	//
+-	//case PS_OPENING:
+-	//	SetWindowText(hWnd, _T("æ­£åœ¨æ‰“å¼€..."));
+-	//	break;
+-	//
+-	//case PS_PAUSING:
+-	//	SetWindowText(hWnd, _T("æ­£åœ¨æš‚åœ..."));
+-	//	break;
+-	//
+-	//case PS_PAUSED:
+-	//	break;
+-	//
+-	//case PS_PLAYING:
+-	//	SetWindowText(hWnd, _T("å¼€å§‹æ’­æ”¾..."));
+-	//	break;
+-	//
+-	//case PS_PLAY:
+-	//	break;
+-	//
+-	//case PS_CLOSING:
+-	//	SetWindowText(hWnd, _T("æ­£åœ¨å…³é—­..."));
+-	//	break;
+-	//}
+ 
+ 	return S_OK;
+ }
+ 
+ HRESULT CMyPlayer::OnOpenSucceeded()
+ {
+-	//SetWindowText(GetDlgItem(g_hTextWnd, IDPAUSE), _T("æš‚åœ"));
+-	//m_nDuration = m_pAPlayer->GetDuration();
+-	if (m_pAPlayer)
+-	{
+-		SendMessage(_hParent, MM_PREPARED, m_pAPlayer->GetDuration(), 0);
+-	}
++	SetWindowText(GetDlgItem(g_hTextWnd, IDPAUSE), _T("ÔÝÍ£"));
++	m_nDuration = m_pAPlayer->GetDuration();
+ 	return S_OK;
+ }
+ 
+-HRESULT CMyPlayer::GetDuration()
+-{
+-	return m_pAPlayer?m_pAPlayer->GetDuration():0;
+-}
+-
+ HRESULT CMyPlayer::OnSeekCompleted(LONG nPosition)
+ {
+ 	return S_OK;
+@@ -157,22 +151,22 @@ HRESULT CMyPlayer::OnVideoSizeChanged(void)
+ 
+ HRESULT CMyPlayer::OnDownloadCodec(BSTR strCodecPath)
+ {
+-	// USES_CONVERSION;
+-	// TCHAR szText[MAX_PATH];
+-	// TCHAR szPath[MAX_PATH];
+-	// GetPathFromFullName(W2T(strCodecPath), szPath);
+-	// wsprintf(szText, _T("ç¼ºå°‘è§£ç å™¨ %s, ä¸‹è½½åŽè§£åŽ‹æ”¾åœ¨%sæ–‡ä»¶å¤¹ä¸‹ã€‚\nä¸‹è½½åœ°å€ï¼šhttp://aplayer.open.xunlei.com/codecs.zip"), W2T(strCodecPath), szPath);
+-	// MessageBox(g_hTextWnd, szText, _T("SimplePlayer"), MB_ICONINFORMATION);
+-
+-	// å¼‚æ­¥ä¸‹è½½è§£ç å™¨æ¨¡å¼ï¼Œé€šçŸ¥APlayerå–æ¶ˆå½“å‰ä¸‹è½½
++	USES_CONVERSION;
++	TCHAR szText[MAX_PATH];
++	TCHAR szPath[MAX_PATH];
++	GetPathFromFullName(W2T(strCodecPath), szPath);
++	wsprintf(szText, _T("È±ÉÙ½âÂëÆ÷ %s, ÏÂÔØºó½âÑ¹·ÅÔÚ%sÎÄ¼þ¼ÐÏÂ¡£\nÏÂÔØµØÖ·£ºhttp://aplayer.open.xunlei.com/codecs.zip"), W2T(strCodecPath), szPath);
++	MessageBox(g_hTextWnd, szText, _T("SimplePlayer"), MB_ICONINFORMATION);
++
++	// Òì²½ÏÂÔØ½âÂëÆ÷Ä£Ê½£¬Í¨ÖªAPlayerÈ¡Ïûµ±Ç°ÏÂÔØ
+ 	m_pAPlayer->SetConfig(19, _bstr_t("0"));
+ 	return S_OK;
+ }
+ 
+ void CMyPlayer::Initialize()
+ {
+-	//m_nPosition = 0;
+-	//m_nDuration = 1000;
++	m_nPosition = 0;
++	m_nDuration = 1000;
+ 	m_pAPlayer = NULL;
+ 	m_pConnectionPoint = NULL;
+ 	m_dwCookie = 0;
+@@ -205,6 +199,51 @@ BOOL CMyPlayer::GetPathFromFullName(const TCHAR * pcszFullName, TCHAR * pszPath)
+ 	return TRUE;
+ }
+ 
++void CMyPlayer::OpenLocalFile(void)
++{
++	if (m_pAPlayer == NULL)
++	{
++		TCHAR szFullName[MAX_PATH];
++		GetModuleFileNameW(NULL, szFullName, MAX_PATH);
++		TCHAR szPath[MAX_PATH];
++		GetPathFromFullName(szFullName, szPath);
++		wsprintf(szFullName, _T("ÇëÏÈÏÂÔØAPlayer SDK£¬²¢½«Æä·Å½âÑ¹·ÅÔÚ%sÎÄ¼þ¼ÐÏÂ¡£ÏÂÔØµØÖ·£ºhttp://aplayer.open.xunlei.com/codecs.zip"), szPath);
++		MessageBox(g_hTextWnd, szFullName, _T("SimplePlayer"), MB_ICONINFORMATION);
++		return ;
++	}
++	// The file path
++	TCHAR szFileName[MAX_PATH];
++	memset(szFileName, 0, sizeof(szFileName));
++
++	// Build filter
++	TCHAR szAllFormat[512];
++	lstrcpy(szAllFormat, _T(""));
++	lstrcat(szAllFormat, _T("*.wmv;*.wmp;*.wm;*.asf;*.wma;*.avi;*.wav;*.mpg;*.mpeg;*.dat;"));
++	lstrcat(szAllFormat, _T("*.ts;*.mpa;*.mp2;*.vob;*.ifo;*.mp3;*.mid;*.ogm;*.ogg;*.cda;"));
++	lstrcat(szAllFormat, _T("*.d2v;*.mp4;*.3gp;*.mkv;*.rm;*.ram;*.rmvb;*.rpm;*.ra;*.mov;"));
++	lstrcat(szAllFormat, _T("*.qt;*.amr;*.mpc;*.flv;*.swf;"));
++	lstrcat(szAllFormat, _T("*.evo;*.tta;*.m4b;"));
++	lstrcat(szAllFormat, _T("*.xv;*.xvx;*.xlmv"));
++
++	TCHAR szFilter[512];
++	TCHAR * pFilter = szFilter;
++	wsprintf(pFilter, _T("Ö§³ÖµÄÃ½ÌåÎÄ¼þ(%s)"), szAllFormat);
++	pFilter += (lstrlen(pFilter) + 1);
++	lstrcpy(pFilter, szAllFormat);
++	pFilter += (lstrlen(pFilter) + 1);
++	lstrcpy(pFilter, _T("ËùÓÐÎÄ¼þ(*.*)"));
++	pFilter += (lstrlen(pFilter) + 1);
++	lstrcpy(pFilter, _T("*.*"));
++	pFilter += (lstrlen(pFilter) + 1);
++	*pFilter = 0; pFilter++;
++
++	// Select file
++	BOOL bResult = g_MyPlayer.SelectFileDlg(g_hTextWnd, FALSE, _T("Ñ¡ÔñÃ½ÌåÎÄ¼þ"), szFilter,
++		szFileName, countof(szFileName), NULL, 0);
++	if(bResult)
++		g_MyPlayer.m_pAPlayer->Open(szFileName);
++}
++
+ void CMyPlayer::Release()
+ {
+ 	if (m_pAPlayer != NULL)
+@@ -255,8 +294,6 @@ HRESULT CMyPlayer::CreateInstanceFromFile(const TCHAR * pcszPath,
+ 	if(FAILED(hr))
+ 		return hr;
+ 
+-	spCF.Release();
+-
+ 	return S_OK;
+ }
+ 
+@@ -275,20 +312,15 @@ BOOL CMyPlayer::CreateAPlayerWindow()
+ 
+ 	if (SUCCEEDED(hr))
+ 	{
+-		// |WS_EX_NOACTIVATE
+ 		m_hAPlayerWnd = ::CreateWindowEx(WS_EX_TOOLWINDOW, _T(ATLAXWIN_CLASS), _T(""),
+ 										WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
+ 										CW_USEDEFAULT, 0, CW_USEDEFAULT, 0,
+-										_hParent, NULL, NULL, NULL);
+-		// https://stackoverflow.com/questions/852856/win32-c-creating-a-popup-window-without-stealing-focus
+-		ShowWindow(m_hAPlayerWnd, SW_SHOWNOACTIVATE);
+-		SetWindowLong(m_hAPlayerWnd, GWLP_USERDATA, (LONG_PTR)this);
++										g_hTextWnd, NULL, NULL, NULL);
+ 	}
+ 
+ 	if (::IsWindow(m_hAPlayerWnd))
+ 	{
+ 		hr = AtlAxAttachControl(m_pAPlayer, m_hAPlayerWnd, NULL);
+-		_SysWndProc = (WNDPROC)SetWindowLong(m_hAPlayerWnd, GWLP_WNDPROC, (LONG_PTR)CMyPlayer::WndProc);
+ 	}
+ 
+ 	CComQIPtr<IConnectionPointContainer> spContainer;
+@@ -307,175 +339,308 @@ BOOL CMyPlayer::CreateAPlayerWindow()
+ 	if (SUCCEEDED(hr))
+ 	{
+ 		g_APlayerSink.SetEventHandler(this);
+-		hr = m_pConnectionPoint->Advise(&g_APlayerSink, &m_dwCookie);
++		hr = g_MyPlayer.m_pConnectionPoint->Advise(&g_APlayerSink, &g_MyPlayer.m_dwCookie);
+ 	}
+ 
+-	// http://aplayer.open.xunlei.com/bbs/read.php?tid=468712
+-	m_pAPlayer->SetConfig(119, _bstr_t("1")) ;
+-
+ 	if (SUCCEEDED(hr))
+ 		return TRUE;
+ 	else
+ 		return FALSE;
+ }
+ 
+-
+-void CMyPlayer::Close()
++BOOL CMyPlayer::SetAPlayerWindowSize(HWND hwnd)
+ {
+-	if (m_pAPlayer)
+-	{
+-		m_pAPlayer->Close();
+-	}
+-}
+-bool CMyPlayer::PlayVideoFile(TCHAR* path)
+-{
+-	if (m_pAPlayer == NULL)
++	RECT rect;
++	GetClientRect(hwnd, &rect);
++
++	BOOL bResult = FALSE;
++	if (::IsWindow(m_hAPlayerWnd))
+ 	{
+-		TCHAR szFullName[MAX_PATH];
+-		GetModuleFileNameW(NULL, szFullName, MAX_PATH);
+-		TCHAR szPath[MAX_PATH];
+-		GetPathFromFullName(szFullName, szPath);
+-		wsprintf(szFullName, _T("è¯·å…ˆä¸‹è½½APlayer SDKï¼Œå¹¶å°†å…¶æ”¾è§£åŽ‹æ”¾åœ¨%sæ–‡ä»¶å¤¹ä¸‹ã€‚ä¸‹è½½åœ°å€ï¼šhttp://aplayer.open.xunlei.com/codecs.zip"), szPath);
+-		MessageBox(_hParent, szFullName, _T("SimplePlayer"), MB_ICONINFORMATION);
+-		return false;
++		bResult = ::SetWindowPos(m_hAPlayerWnd, 
++								HWND_TOP, 
++								rect.left, 
++								rect.top, 
++								rect.right - rect.left, 
++								rect.bottom - rect.top - 60, 
++								SWP_SHOWWINDOW);
+ 	}
+ 
+-	m_pAPlayer->Open(path);
+-	return true;
++	return bResult;
+ }
+ 
+-void CMyPlayer::Play()
++// Sets the dialog box icons
++inline void chSETDLGICONS(HWND hWnd, int idi)
+ {
+-	if (m_pAPlayer != NULL)
+-	{
+-		m_pAPlayer->Play();
+-	}
++	SendMessage(hWnd, WM_SETICON, ICON_BIG,  (LPARAM) 
++		LoadIcon((HINSTANCE) GetWindowLongPtr(hWnd, GWLP_HINSTANCE), 
++		MAKEINTRESOURCE(idi)));
++	SendMessage(hWnd, WM_SETICON, ICON_SMALL, (LPARAM) 
++		LoadIcon((HINSTANCE) GetWindowLongPtr(hWnd, GWLP_HINSTANCE), 
++		MAKEINTRESOURCE(idi)));
+ }
+ 
+-void CMyPlayer::Pause()
++BOOL Dlg_OnInitDialog(HWND hwnd, HWND hwndFocus, LPARAM lParam)
+ {
+-	if (m_pAPlayer != NULL)
++	g_hDialog = hwnd;
++
++	chSETDLGICONS(hwnd, IDI_ICON1);
++	SendMessage(GetDlgItem(hwnd, IDC_SLIDER1), TBM_SETRANGE, (WPARAM)TRUE, (LPARAM)MAKELONG(0, 1000));
++	SetTimer(hwnd, 1, 1000, NULL);
++
++	g_hTextWnd = hwnd;
++	g_MyPlayer.Initialize();
++	if (g_MyPlayer.CreateAPlayerWindow() == TRUE)
+ 	{
+-		m_pAPlayer->Pause();
++		g_MyPlayer.SetAPlayerWindowSize(hwnd);
++	}
++	else
++	{
++		HWND hWnd = GetDlgItem(hwnd, IDC_STATIC1);
++		SetWindowText(hWnd, _T("¼ÓÔØAPlayerÊ§°Ü£¡"));
+ 	}
+-}
+ 
+-bool CMyPlayer::IsPlaying()
+-{
+-	return m_pAPlayer!=NULL && m_pAPlayer->GetState()==PS_PLAY;
++	return(TRUE);
+ }
+ 
+-bool CMyPlayer::IsPaused()
++BOOL CMyPlayer::SelectFileDlg(HWND hOwner,
++				   BOOL bIsSave,
++				   const TCHAR * pcszTitle,
++				   const TCHAR * pcszFilter,
++				   TCHAR * pszFilePath,
++				   int nMaxFilePath,
++				   TCHAR * pszFileTitle,
++				   int nMaxFileTitle)
+ {
+-	return m_pAPlayer!=NULL && m_pAPlayer->GetState()==PS_PAUSED;
++	OPENFILENAME ofn;
++
++	ofn.lStructSize = sizeof(ofn);
++	ofn.hwndOwner = hOwner;
++	ofn.hInstance = NULL;
++	ofn.lpstrFilter = pcszFilter;
++	ofn.lpstrCustomFilter = NULL;
++	ofn.nMaxCustFilter = 0;
++	ofn.nFilterIndex = 1;
++	ofn.lpstrFile = pszFilePath;
++	ofn.nMaxFile = nMaxFilePath;
++	ofn.lpstrFileTitle = pszFileTitle;
++	ofn.nMaxFileTitle = nMaxFileTitle;
++	ofn.lpstrInitialDir = NULL;
++	ofn.lpstrTitle = pcszTitle;
++	ofn.Flags = OFN_HIDEREADONLY;
++	ofn.nFileOffset = 0;
++	ofn.nFileExtension = 0;
++	ofn.lpstrDefExt = NULL;
++	ofn.lCustData = NULL;
++	ofn.lpfnHook = NULL;
++	ofn.lpTemplateName = NULL;
++
++	BOOL bResult = 0;
++	if(bIsSave)
++		bResult = GetSaveFileName(&ofn);
++	else
++		bResult = GetOpenFileName(&ofn);
++	return bResult;
+ }
+ 
+-void CMyPlayer::Stop()
++
++
++long WINAPI FullScreenWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+ {
+-	if (m_pAPlayer != NULL 
+-		&& (m_pAPlayer->GetState()==PS_PLAY||m_pAPlayer->GetState()==PS_PAUSED)
+-		)
++	switch(uMsg)
+ 	{
+-		m_pAPlayer->Close();
++	case WM_CLOSE:
+ 		{
+-			
+-			//SendMessage(GetDlgItem(hwnd, IDC_SLIDER1), TBM_SETPOS, (WPARAM)TRUE, (LPARAM)0);
+-			//SetWindowText(GetDlgItem(hwnd, IDC_STATIC1), _T("00:00:00/00:00:00"));
+-			//SetWindowText(GetDlgItem(g_hTextWnd, IDPAUSE), _T("æ’­æ”¾"));
++			ExitFullScreen();
++			return 0;
+ 		}
++		break;
++
++	case WM_LBUTTONDBLCLK:
++		ExitFullScreen();
++		break;
++
++	case WM_KEYDOWN:
++		switch(LOWORD(wParam))
++		{
++		case VK_ESCAPE:
++			::ExitFullScreen();
++			break;
++		}
++		break;
+ 	}
+-}
+ 
+-long CMyPlayer::GetPosition()
+-{
+-	return m_pAPlayer?m_pAPlayer->GetPosition():0;
++	return ::DefWindowProc(hWnd, uMsg, wParam, lParam);
+ }
+ 
+-void CMyPlayer::SetPosition(long pos)
++
++void EnterFullScreen(void)
+ {
+-	if (m_pAPlayer)
++	if(g_hFullScreenWnd == NULL)
+ 	{
+-		m_pAPlayer->SetPosition(pos);
++		// Register window class
++		WNDCLASSEX wc;
++		wc.cbSize = sizeof(wc);
++		wc.cbClsExtra = 0;
++		wc.cbWndExtra = 0;
++		wc.hbrBackground = (HBRUSH)::GetStockObject(BLACK_BRUSH);
++		wc.hCursor = ::LoadCursor(NULL, IDC_ARROW);
++		wc.hIcon = NULL;
++		wc.hIconSm = NULL;
++		wc.hInstance = NULL;
++		wc.lpfnWndProc = FullScreenWindowProc;
++		wc.lpszClassName = _T("FullScreenContainer");
++		wc.lpszMenuName = 0;
++		wc.style = CS_DBLCLKS;
++
++		if(!::RegisterClassEx(&wc))
++		{
++			int nError = GetLastError();
++			if(nError != ERROR_CLASS_ALREADY_EXISTS)
++				return;
++		}
++
++		int w = ::GetSystemMetrics(SM_CXSCREEN);
++		int h = ::GetSystemMetrics(SM_CYSCREEN);
++		g_hFullScreenWnd = ::CreateWindowEx(WS_EX_TOPMOST, wc.lpszClassName, _T(""), WS_POPUP, 0, 0, w, h,
++											NULL, NULL, NULL, NULL);
+ 	}
++
++	::ShowWindow(g_hFullScreenWnd, SW_SHOW);
++	::SetParent(g_MyPlayer.m_hAPlayerWnd, g_hFullScreenWnd);
++
++	// Set Position
++	RECT rc;
++	::GetClientRect(g_hFullScreenWnd, &rc);
++	::SetWindowPos(g_MyPlayer.m_hAPlayerWnd, NULL, rc.left, rc.top, rc.right-rc.left, rc.bottom-rc.top, 0);
+ }
+ 
+-// Sets the dialog box icons
+-inline void chSETDLGICONS(HWND hWnd, int idi)
++
++void ExitFullScreen(void)
+ {
+-	SendMessage(hWnd, WM_SETICON, ICON_BIG,  (LPARAM) 
+-		LoadIcon((HINSTANCE) GetWindowLongPtr(hWnd, GWLP_HINSTANCE), 
+-		MAKEINTRESOURCE(idi)));
+-	SendMessage(hWnd, WM_SETICON, ICON_SMALL, (LPARAM) 
+-		LoadIcon((HINSTANCE) GetWindowLongPtr(hWnd, GWLP_HINSTANCE), 
+-		MAKEINTRESOURCE(idi)));
++	::SetParent(g_MyPlayer.m_hAPlayerWnd, g_hDialog);
++	g_MyPlayer.SetAPlayerWindowSize(g_hDialog);
++	::ShowWindow(g_hFullScreenWnd, SW_HIDE);
+ }
+ 
+-BOOL Dlg_OnInitDialog(HWND hwnd, HWND hwndFocus, LPARAM lParam)
++
++void Dlg_OnCommand(HWND hwnd, int id, HWND hwndCtl, UINT codeNotify)
+ {
+ 
+-	return(TRUE);
+-}
++	switch (id)
++	{
++	case IDCANCEL:
++		KillTimer(hwnd, 1);
++		g_MyPlayer.Release();
++		EndDialog(hwnd, id);
++		break;
+ 
+-CComModule _module;
++	case IDOPEN:
++		g_MyPlayer.OpenLocalFile();
++		break;
+ 
+-CMyPlayer::CMyPlayer(int & error_code, HINSTANCE hInstance, HWND hParent)
+-{
+-	error_code=1;
+-	// å¦‚æžœä¸€ä¸ªè¿è¡Œåœ¨ Windows XP ä¸Šçš„åº”ç”¨ç¨‹åºæ¸…å•æŒ‡å®šè¦
+-	// ä½¿ç”¨ ComCtl32.dll ç‰ˆæœ¬ 6 æˆ–æ›´é«˜ç‰ˆæœ¬æ¥å¯ç”¨å¯è§†åŒ–æ–¹å¼ï¼Œ
+-	//åˆ™éœ€è¦ InitCommonControlsEx()ã€‚  å¦åˆ™ï¼Œå°†æ— æ³•åˆ›å»ºçª—å£ã€‚
+-	INITCOMMONCONTROLSEX InitCtrls;
+-	InitCtrls.dwSize = sizeof(InitCtrls);
+-	// å°†å®ƒè®¾ç½®ä¸ºåŒ…æ‹¬æ‰€æœ‰è¦åœ¨åº”ç”¨ç¨‹åºä¸­ä½¿ç”¨çš„
+-	// å…¬å…±æŽ§ä»¶ç±»ã€‚
+-	InitCtrls.dwICC = ICC_WIN95_CLASSES;
+-	InitCommonControlsEx(&InitCtrls);
+-	_module.Init(NULL, hInstance);
++	case IDPAUSE:
++		if (g_MyPlayer.m_pAPlayer != NULL)
++		{
++			if (g_MyPlayer.m_pAPlayer->GetState() == PS_PLAY)
++			{
++				g_MyPlayer.m_pAPlayer->Pause();
++				SetWindowText(GetDlgItem(hwnd, IDPAUSE), _T("²¥·Å"));
++			}
++			else if (g_MyPlayer.m_pAPlayer->GetState() == PS_PAUSED)
++			{
++				g_MyPlayer.m_pAPlayer->Play();
++				SetWindowText(GetDlgItem(hwnd, IDPAUSE), _T("ÔÝÍ£"));
++			}
++		}
++		break;
+ 
+-	AtlAxWinInit();
++	case IDSTOP:
++		if (g_MyPlayer.m_pAPlayer != NULL)
++		{
++			if (g_MyPlayer.m_pAPlayer->GetState() == PS_PLAY || 
++				g_MyPlayer.m_pAPlayer->GetState() == PS_PAUSED)
++			{
++				g_MyPlayer.m_pAPlayer->Close();
++				SendMessage(GetDlgItem(hwnd, IDC_SLIDER1), TBM_SETPOS, (WPARAM)TRUE, (LPARAM)0);
++				SetWindowText(GetDlgItem(hwnd, IDC_STATIC1), _T("00:00:00/00:00:00"));
++				SetWindowText(GetDlgItem(g_hTextWnd, IDPAUSE), _T("²¥·Å"));
++			}
++		}
++		break;
+ 
+-	m_hModule=hInstance;
+-	_hParent=hParent;
+-	//g_hDialog = hwnd;
++	case IDFULLSCREEN:
++		::EnterFullScreen();
++		break;
+ 
+-	//chSETDLGICONS(hwnd, IDI_ICON1);
+-	//SendMessage(GetDlgItem(hwnd, IDC_SLIDER1), TBM_SETRANGE, (WPARAM)TRUE, (LPARAM)MAKELONG(0, 1000));
++	case IDABOUT:
++		MessageBox(hwnd, _T("×÷Õß£ºhehaifeng@xunlei.com"), _T("¹ØÓÚ"), MB_ICONINFORMATION);
++		break;
++	}
++}
+ 
+-	SetTimer(hParent, 1, 1000, NULL);
+ 
+-	Initialize();
+-	if (CreateAPlayerWindow())
++
++void WINAPI Dlg_OnTimer(HWND hwnd, UINT id)
++{
++	if (id != 1 || g_MyPlayer.m_pAPlayer == NULL)
+ 	{
+-		error_code=0;
++		return;
+ 	}
+-	else
++
++	if (g_MyPlayer.m_pAPlayer->GetState() == PS_PLAY || 
++		g_MyPlayer.m_pAPlayer->GetState() == PS_PAUSED)
+ 	{
+-		//HWND hWnd = GetDlgItem(hwnd, IDC_STATIC1);
+-		//SetWindowText(hWnd, _T("åŠ è½½APlayerå¤±è´¥ï¼"));
+-		error_code=-1;
+-	}
++		g_MyPlayer.m_nPosition = g_MyPlayer.m_pAPlayer->GetPosition();
+ 
++		TCHAR szPosition[64];
++		TCHAR szDuration[64];
++		g_MyPlayer.MillisecondToText(g_MyPlayer.m_nPosition, szPosition);
++		g_MyPlayer.MillisecondToText(g_MyPlayer.m_nDuration, szDuration);
+ 
+-	//DialogBoxParam(hInstance, MAKEINTRESOURCE(IDD_DIALOG_PLAYER), 
+-	//				NULL, Dlg_Proc, _ttoi(lpCmdLine));
++		lstrcat(szPosition, _T("/"));
++		lstrcat(szPosition, szDuration);
+ 
++		int nPos =  int (g_MyPlayer.m_nPosition / (double)g_MyPlayer.m_nDuration * 1000);
++		SendMessage(GetDlgItem(hwnd, IDC_SLIDER1), TBM_SETPOS, (WPARAM)TRUE, (LPARAM)nPos);
++		SetWindowText(GetDlgItem(hwnd, IDC_STATIC1), szPosition);
++	}
+ }
+ 
+-CMyPlayer::~CMyPlayer()
++void Dlg_OnHScroll(HWND hwnd, HWND hwndCtl, WPARAM wParam, LPARAM lParam)
+ {
+-	Release();
+-	m_pAPlayer = 0;
++	if (g_MyPlayer.m_pAPlayer != NULL)
++	{
++		if (g_MyPlayer.m_pAPlayer->GetState() == PS_PLAY || 
++			g_MyPlayer.m_pAPlayer->GetState() == PS_PAUSED)
++		{
++			int nPos = (int)SendMessage(GetDlgItem(hwnd, IDC_SLIDER1), TBM_GETPOS, (WPARAM)0, (LPARAM)0);
++			nPos = int (nPos / 1000.0 * g_MyPlayer.m_nDuration);
++			g_MyPlayer.m_pAPlayer->SetPosition(nPos);
++		}
++	}
++
++	return;
+ }
+ 
+-LRESULT CMyPlayer::RunProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
++INT_PTR WINAPI Dlg_Proc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+ {
+-	switch (msg)
++	switch (uMsg)
+ 	{
+-	case WM_SETFOCUS:
+-		LogIs(2, "WM_SETFOCUS");
+-		return TRUE;
+-	default:
+-		break;
++		chHANDLE_DLGMSG(hwnd, WM_INITDIALOG, Dlg_OnInitDialog);
++		chHANDLE_DLGMSG(hwnd, WM_COMMAND,    Dlg_OnCommand);
++		chHANDLE_DLGMSG(hwnd, WM_TIMER,      Dlg_OnTimer);
++		chHANDLE_DLGMSG(hwnd, WM_HSCROLL,    Dlg_OnHScroll);
+ 	}
+-	return ::CallWindowProc(_SysWndProc, hwnd, msg, w, l);
++
++	return(FALSE);
++}
++
++int WINAPI _tWinMain(HINSTANCE hinstExe, HINSTANCE, PTSTR pszCmdLine, int)
++{
++	AtlAxWinInit();
++
++	DialogBoxParam(hinstExe, MAKEINTRESOURCE(IDD_DIALOG_PLAYER), 
++					NULL, Dlg_Proc, _ttoi(pszCmdLine));
++
++	return(0);
+ }
+\ No newline at end of file
+diff --git a/simpleplayer.h b/simpleplayer.h
+index 74a4d72..bdc224d 100644
+--- a/simpleplayer.h
++++ b/simpleplayer.h
+@@ -1,5 +1,4 @@
+-#pragma once
+-
++#include <Windowsx.h>
+ #include <tchar.h>
+ #include <atlbase.h>
+ #include "PlayerSink.h"
+@@ -37,10 +36,7 @@ public:
+ 	IConnectionPoint *		m_pConnectionPoint;
+ 	DWORD					m_dwCookie;
+ 	HWND					m_hAPlayerWnd;
+-	HWND					_hParent;
+ 	HMODULE					m_hModule;
+-	CMyPlayer(int & error_code, HINSTANCE hInstance, HWND hParent);
+-	~CMyPlayer();
+ 
+ public:
+ 	int				GetConfigInt(int nConfigId);
+@@ -48,10 +44,13 @@ public:
+ 	void			Release();
+ 	BOOL			GetPathFromFullName(const TCHAR * pcszFullName, TCHAR * pszPath);
+ 	BOOL			CreateAPlayerWindow();
+-
++	BOOL			SetAPlayerWindowSize(HWND hwnd);
++	void			OpenLocalFile(void);
+ 	void			MillisecondToText(int nMs, TCHAR * pszText);
+ 	HRESULT			CreateInstanceFromFile(const TCHAR * pcszPath, REFCLSID rclsid, 
+ 										   REFIID riid, IUnknown * pUnkOuter, LPVOID * ppv);
++	BOOL			SelectFileDlg(HWND hOwner, BOOL bIsSave, const TCHAR * pcszTitle, const TCHAR * pcszFilter,
++								  TCHAR * pszFilePath, int nMaxFilePath, TCHAR * pszFileTitle, int nMaxFileTitle);
+ 
+ 	// aplayer event handler
+ 	virtual	HRESULT	OnMessage(LONG nMessage, LONG wParam, LONG lParam);
+@@ -61,27 +60,4 @@ public:
+ 	virtual	HRESULT	OnBuffer(LONG nPercent);
+ 	virtual	HRESULT	OnVideoSizeChanged(void);
+ 	virtual	HRESULT	OnDownloadCodec(BSTR strCodecPath);
+-
+-
+-	void Play();
+-	void Stop();
+-	void Pause();
+-	bool IsPlaying();
+-	bool IsPaused();
+-	long GetPosition();
+-	void SetPosition(long pos);
+-	long GetDuration();
+-	bool PlayVideoFile(TCHAR* path);
+-	void SetFullScreen(bool val){};
+-	//void Release(){};
+-	void Close();
+-protected:
+-	LRESULT RunProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l);
+-
+-	static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+-	{
+-		return ((CMyPlayer*)GetWindowLongPtr(hwnd, GWLP_USERDATA))->RunProc(hwnd, message, wParam, lParam);
+-	}
+-
+-	WNDPROC _SysWndProc;
+ };

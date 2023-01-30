@@ -7,5 +7,10 @@ x64
 *.aps
 bin
 *.zip
+*.rar
+
+// extract from APlayerSDK.zip/samples/SimplePlayer and apply patch
 src/VideoPlayer/PlayerSink.cpp
 src/VideoPlayer/PlayerSink.h
+src/VideoPlayer/simpleplayer.cpp
+src/VideoPlayer/simpleplayer.h
