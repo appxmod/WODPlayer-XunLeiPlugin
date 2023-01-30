@@ -1,5 +1,5 @@
 diff --git a/simpleplayer.cpp b/simpleplayer.cpp
-index 2cf960b..364c71e 100644
+index 12be9bd..364c71e 100644
 --- a/simpleplayer.cpp
 +++ b/simpleplayer.cpp
 @@ -1,14 +1,11 @@
@@ -271,7 +271,7 @@ index 2cf960b..364c71e 100644
  void CMyPlayer::Release()
  {
  	if (m_pAPlayer != NULL)
-@@ -255,8 +294,6 @@ HRESULT CMyPlayer::CreateInstanceFromFile(const TCHAR * pcszPath,
+@@ -255,15 +294,13 @@ HRESULT CMyPlayer::CreateInstanceFromFile(const TCHAR * pcszPath,
  	if(FAILED(hr))
  		return hr;
  
@@ -280,7 +280,16 @@ index 2cf960b..364c71e 100644
  	return S_OK;
  }
  
-@@ -275,20 +312,15 @@ BOOL CMyPlayer::CreateAPlayerWindow()
+-BOOL CMyPlayer::CreateAPlayerWindow(HMODULE plugin)
++BOOL CMyPlayer::CreateAPlayerWindow()
+ {
+ 	TCHAR szFullName[MAX_PATH];
+-	GetModuleFileNameW(plugin, szFullName, MAX_PATH);
++	GetModuleFileNameW(NULL, szFullName, MAX_PATH);
+ 	TCHAR szPath[MAX_PATH];
+ 	GetPathFromFullName(szFullName, szPath);
+ 	wsprintf(szPath, _T("%s\\APlayer.dll"), szPath);
+@@ -275,20 +312,15 @@ BOOL CMyPlayer::CreateAPlayerWindow(HMODULE plugin)
  
  	if (SUCCEEDED(hr))
  	{
@@ -302,7 +311,7 @@ index 2cf960b..364c71e 100644
  	}
  
  	CComQIPtr<IConnectionPointContainer> spContainer;
-@@ -307,175 +339,308 @@ BOOL CMyPlayer::CreateAPlayerWindow()
+@@ -307,175 +339,308 @@ BOOL CMyPlayer::CreateAPlayerWindow(HMODULE plugin)
  	if (SUCCEEDED(hr))
  	{
  		g_APlayerSink.SetEventHandler(this);
@@ -324,26 +333,13 @@ index 2cf960b..364c71e 100644
 +BOOL CMyPlayer::SetAPlayerWindowSize(HWND hwnd)
  {
 -	if (m_pAPlayer)
--	{
--		m_pAPlayer->Close();
--	}
--}
--bool CMyPlayer::PlayVideoFile(TCHAR* path)
--{
--	if (m_pAPlayer == NULL)
 +	RECT rect;
 +	GetClientRect(hwnd, &rect);
 +
 +	BOOL bResult = FALSE;
 +	if (::IsWindow(m_hAPlayerWnd))
  	{
--		TCHAR szFullName[MAX_PATH];
--		GetModuleFileNameW(NULL, szFullName, MAX_PATH);
--		TCHAR szPath[MAX_PATH];
--		GetPathFromFullName(szFullName, szPath);
--		wsprintf(szFullName, _T("请先下载APlayer SDK，并将其放解压放在%s文件夹下。下载地址：http://aplayer.open.xunlei.com/codecs.zip"), szPath);
--		MessageBox(_hParent, szFullName, _T("SimplePlayer"), MB_ICONINFORMATION);
--		return false;
+-		m_pAPlayer->Close();
 +		bResult = ::SetWindowPos(m_hAPlayerWnd, 
 +								HWND_TOP, 
 +								rect.left, 
@@ -352,20 +348,27 @@ index 2cf960b..364c71e 100644
 +								rect.bottom - rect.top - 60, 
 +								SWP_SHOWWINDOW);
  	}
- 
--	m_pAPlayer->Open(path);
--	return true;
++
 +	return bResult;
  }
- 
--void CMyPlayer::Play()
+-bool CMyPlayer::PlayVideoFile(TCHAR* path)
++
 +// Sets the dialog box icons
 +inline void chSETDLGICONS(HWND hWnd, int idi)
  {
--	if (m_pAPlayer != NULL)
+-	LogIs(L"PlayVideoFile=%s, m_pAPlayer=%ld", path, m_pAPlayer);
+-	if (m_pAPlayer == NULL)
 -	{
--		m_pAPlayer->Play();
+-		TCHAR szFullName[MAX_PATH];
+-		GetModuleFileNameW(NULL, szFullName, MAX_PATH);
+-		TCHAR szPath[MAX_PATH];
+-		GetPathFromFullName(szFullName, szPath);
+-		wsprintf(szFullName, _T("请先下载APlayer SDK，并将其放解压放在%s文件夹下。下载地址：http://aplayer.open.xunlei.com/codecs.zip"), szPath);
+-		MessageBox(_hParent, szFullName, _T("SimplePlayer"), MB_ICONINFORMATION);
+-		return false;
 -	}
+-	m_pAPlayer->Open(path);
+-	return true;
 +	SendMessage(hWnd, WM_SETICON, ICON_BIG,  (LPARAM) 
 +		LoadIcon((HINSTANCE) GetWindowLongPtr(hWnd, GWLP_HINSTANCE), 
 +		MAKEINTRESOURCE(idi)));
@@ -374,7 +377,7 @@ index 2cf960b..364c71e 100644
 +		MAKEINTRESOURCE(idi)));
  }
  
--void CMyPlayer::Pause()
+-void CMyPlayer::Play()
 +BOOL Dlg_OnInitDialog(HWND hwnd, HWND hwndFocus, LPARAM lParam)
  {
 -	if (m_pAPlayer != NULL)
@@ -388,11 +391,17 @@ index 2cf960b..364c71e 100644
 +	g_MyPlayer.Initialize();
 +	if (g_MyPlayer.CreateAPlayerWindow() == TRUE)
  	{
--		m_pAPlayer->Pause();
+-		m_pAPlayer->Play();
 +		g_MyPlayer.SetAPlayerWindowSize(hwnd);
-+	}
+ 	}
+-}
+-
+-void CMyPlayer::Pause()
+-{
+-	if (m_pAPlayer != NULL)
 +	else
-+	{
+ 	{
+-		m_pAPlayer->Pause();
 +		HWND hWnd = GetDlgItem(hwnd, IDC_STATIC1);
 +		SetWindowText(hWnd, _T("����APlayerʧ�ܣ�"));
  	}
@@ -570,7 +579,7 @@ index 2cf960b..364c71e 100644
 +		g_MyPlayer.OpenLocalFile();
 +		break;
  
--CMyPlayer::CMyPlayer(int & error_code, HINSTANCE hInstance, HWND hParent)
+-CMyPlayer::CMyPlayer(int & error_code, HMODULE hPlugin, HINSTANCE hInstance, HWND hParent)
 -{
 -	error_code=1;
 -	// 如果一个运行在 Windows XP 上的应用程序清单指定要
@@ -632,7 +641,7 @@ index 2cf960b..364c71e 100644
 -	SetTimer(hParent, 1, 1000, NULL);
  
 -	Initialize();
--	if (CreateAPlayerWindow())
+-	if (CreateAPlayerWindow(hPlugin))
 +
 +void WINAPI Dlg_OnTimer(HWND hwnd, UINT id)
 +{
@@ -719,7 +728,7 @@ index 2cf960b..364c71e 100644
  }
 \ No newline at end of file
 diff --git a/simpleplayer.h b/simpleplayer.h
-index 74a4d72..bdc224d 100644
+index bd73285..bdc224d 100644
 --- a/simpleplayer.h
 +++ b/simpleplayer.h
 @@ -1,5 +1,4 @@
@@ -729,22 +738,23 @@ index 74a4d72..bdc224d 100644
  #include <tchar.h>
  #include <atlbase.h>
  #include "PlayerSink.h"
-@@ -37,10 +36,7 @@ public:
+@@ -37,21 +36,21 @@ public:
  	IConnectionPoint *		m_pConnectionPoint;
  	DWORD					m_dwCookie;
  	HWND					m_hAPlayerWnd;
 -	HWND					_hParent;
  	HMODULE					m_hModule;
--	CMyPlayer(int & error_code, HINSTANCE hInstance, HWND hParent);
+-	CMyPlayer(int & error_code, HMODULE hPlugin, HINSTANCE hInstance, HWND hParent);
 -	~CMyPlayer();
  
  public:
  	int				GetConfigInt(int nConfigId);
-@@ -48,10 +44,13 @@ public:
+ 	void			Initialize();
  	void			Release();
  	BOOL			GetPathFromFullName(const TCHAR * pcszFullName, TCHAR * pszPath);
- 	BOOL			CreateAPlayerWindow();
+-	BOOL			CreateAPlayerWindow(HMODULE plugin);
 -
++	BOOL			CreateAPlayerWindow();
 +	BOOL			SetAPlayerWindowSize(HWND hwnd);
 +	void			OpenLocalFile(void);
  	void			MillisecondToText(int nMs, TCHAR * pszText);
