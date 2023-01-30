@@ -1,0 +1,11 @@
+.vs
+Debug
+Release
+x64
+*.aps
+秘籍
+*.aps
+bin
+*.zip
+src/VideoPlayer/PlayerSink.cpp
+src/VideoPlayer/PlayerSink.h
